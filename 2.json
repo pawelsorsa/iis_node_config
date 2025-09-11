@@ -38,6 +38,27 @@ const HOST_DIR = 'host';
 const DIST_ROOT = 'dist/myapp';
 const DIST_APP = join(DIST_ROOT, 'app');
 
+const WEB_CONFIG = join(DIST_ROOT, 'web.config');
+
+function escapeRegExp(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
+async function replaceInFile(file, from, to) {
+  try {
+    const original = await readFile(file, 'utf8');
+    const re = new RegExp(escapeRegExp(from), 'g');
+    const updated = original.replace(re, to);
+    if (updated !== original) {
+      await writeFile(file, updated, 'utf8');
+      const count = (original.match(re) || []).length;
+      console.log(`[web.config] replaced '${from}' → '${to}' (${count} occurrence${count===1?'':'s'})`);
+    } else {
+      console.warn(`[web.config] '${from}' not found, nothing to replace.`);
+    }
+  } catch (e) {
+    console.warn(`[web.config] could not open ${file}: ${e.message}`);
+  }
+}
+
 async function run(cmd, cwd) {
   console.log(`\n> ${cmd}${cwd ? `  (cwd: ${cwd})` : ''}`);
   await exec(cmd, { cwd, env: process.env });
@@ -81,6 +102,8 @@ async function copyDirContents(srcDir, destDir, { skip = [] } = {}) {
     await mkdir(DIST_APP, { recursive: true });
     await moveDirContents(DIST_ROOT, DIST_APP, { skip: ['app'] });
     await copyDirContents(HOST_DIR, DIST_ROOT, { skip: ['node_modules', '.git'] });
+
+    await replaceInFile(WEB_CONFIG, 'nb05preprod', BASE_PATH);
 
     console.log(`\n✅ Done with configuration: ${CONFIG}\n`);
   } catch (err) {
@@ -139,3 +162,4 @@ steps:
   env:
 
     CONFIG: $(configuration)
+
