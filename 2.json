@@ -5,22 +5,33 @@ import { join } from 'node:path';
 const exec = promisify(_exec);
 
 // --- read config from CLI/env, default '05preprod'
-function argVal(names) {
-  for (const a of process.argv.slice(2)) {
-    for (const n of names) {
-      if (a === n) return null;                 // value is next token
-      if (a.startsWith(n + '=')) return a.split('=').slice(1).join('=');
+// --- READ CONFIG from CLI/env (default '05preprod')
+function getOpt(names) {
+  const argv = process.argv.slice(2);
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    for (const name of names) {
+      if (a === name) {
+        const next = argv[i + 1];
+        if (next && !next.startsWith('-')) return next; // --config 05preprod
+      }
+      if (a.startsWith(name + '=')) {
+        return a.slice(name.length + 1);                // --config=05preprod
+      }
     }
   }
-  const idx = process.argv.findIndex(a => names.includes(a));
-  if (idx !== -1 && process.argv[idx + 1] && !process.argv[idx + 1].startsWith('--')) return process.argv[idx + 1];
   return undefined;
 }
+
 const CONFIG =
-  process.env.CONFIG ??
-  process.env.ANGULAR_CONFIGURATION ??
-  argVal(['--config','--configuration']) ??
+  process.env.CONFIG ||
+  process.env.ANGULAR_CONFIGURATION ||
+  process.env.npm_config_config ||             // set by npm when using: npm run ... -- --config x
+  process.env.npm_config_configuration ||
+  getOpt(['--config', '--configuration']) ||
   '05preprod';
+
+console.log(`[build] using configuration: ${CONFIG}`);
 
 const ANGULAR_BUILD_CMD = `npm run build -- --configuration ${CONFIG}`;
 const HOST_DIR = 'host';
@@ -126,4 +137,5 @@ steps:
 
 - script: npm run build:preprod
   env:
+
     CONFIG: $(configuration)
